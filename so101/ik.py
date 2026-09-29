@@ -83,12 +83,12 @@ def ik(chain: Chain, target, q_init, rot_weight=1.0, attempts=10, seed=0):
         q = least_squares(resid, q0, bounds=(lo, hi)).x
         pos, rot = _pose_err(fk(chain, q), target)
         ok = pos < 1.0 and (rot_weight < 1 or rot < 1.0)
-        score = pos + rot_weight * rot
-        if best is None or score < best[2]:
-            best = (q, ok, score)
         if ok:
-            break
-    return best[0], best[1]
+            return q, True
+        score = pos + rot_weight * rot
+        if best is None or score < best[1]:
+            best = (q, score)
+    return best[0], False
 
 
 def top_down(p, yaw):
