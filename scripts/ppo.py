@@ -1,5 +1,5 @@
 # Vendored from haosulab/ManiSkill examples/baselines/ppo/ppo.py @ 62ff3a5896b4d5b4cf0ac4c8d79afe600c9404a3.
-# Local changes: import so101.envs; --output-dir/--variant/--results-csv; steps_to_80; final 100-episode eval -> CSV.
+# Local changes: import so101.envs; --output-dir/--variant/--results-csv; steps_to_80; final 100-episode eval (max_episode_steps) -> CSV.
 from collections import defaultdict
 import os
 import random
@@ -281,19 +281,21 @@ if __name__ == "__main__":
 
     steps_to_80 = None
 
-    def run_eval():
+    def run_eval(num_steps=None):
         """Deterministic eval; returns metric means (success_once, success_at_end, return, ...)."""
+        num_steps = num_steps or args.num_eval_steps
         eval_obs, _ = eval_envs.reset()
         eval_metrics = defaultdict(list)
         num_episodes = 0
-        for _ in range(args.num_eval_steps):
+        for _ in range(num_steps):
             with torch.no_grad():
                 eval_obs, _, _, _, eval_infos = eval_envs.step(agent.get_action(eval_obs, deterministic=True))
                 if "final_info" in eval_infos:
                     num_episodes += eval_infos["_final_info"].sum()
                     for k, v in eval_infos["final_info"]["episode"].items():
                         eval_metrics[k].append(v)
-        print(f"Evaluated {args.num_eval_steps * args.num_eval_envs} steps resulting in {num_episodes} episodes")
+        print(f"Evaluated {num_steps * args.num_eval_envs} steps resulting in {num_episodes} episodes")
+        assert num_episodes > 0, f"eval ran {num_steps} steps but no episode finished (num_eval_steps < max_episode_steps?)"
         return {k: torch.stack(v).float().mean().item() for k, v in eval_metrics.items()}
 
     for iteration in range(1, args.num_iterations + 1):
@@ -483,7 +485,9 @@ if __name__ == "__main__":
             torch.save(agent.state_dict(), model_path)
             print(f"model saved to {model_path}")
         agent.eval()
-        final = run_eval()
+        if args.num_eval_envs != 100:
+            print(f"WARNING: final eval uses {args.num_eval_envs} episodes; the spec calls for 100 (--num_eval_envs 100)")
+        final = run_eval(max_episode_steps)
         print(f"final eval: {final}")
         if args.results_csv:
             import csv
