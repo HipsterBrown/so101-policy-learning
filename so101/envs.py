@@ -12,6 +12,7 @@ from mani_skill.utils.building import actors
 from mani_skill.utils.building.ground import build_ground
 from mani_skill.utils.registration import register_env
 from mani_skill.utils.structs import Pose
+from mani_skill.utils.structs.types import SceneConfig, SimConfig
 
 import so101.agent  # noqa: F401  registers "so101"
 from so101.agent import GRIPPER_OPEN
@@ -99,6 +100,12 @@ class SO101ReachEnv(SO101BaseEnv):
 
 @register_env("SO101Lift-v1", max_episode_steps=100)
 class SO101LiftEnv(SO101BaseEnv):
+    @property
+    def _default_sim_config(self):
+        # The 5 g cube pinched between two drive-held links needs more solver iterations than the default 15,
+        # or the jaws sink into it (~2 mm per control step at 15; ~0.1 mm steady state at 50).
+        return SimConfig(sim_freq=100, control_freq=20, scene_config=SceneConfig(solver_position_iterations=50))
+
     def _load_scene(self, options: dict):
         super()._load_scene(options)
         # Density and friction from ManiSkill's SO100GraspCube-v1 digital twin.

@@ -34,6 +34,13 @@ GRIPPER_CLOSED = -0.17
 FIXED_OPEN_AXIS = (-1.0, 0.0, 0.0)
 MOVING_OPEN_AXIS = (1.0, 0.0, 0.0)
 
+# PD gains per joint (5 arm + gripper). Arm gains are SO-100's. The gripper uses STS3215-like values
+# (~2 N*m stall, ~5 rad/s no-load): SO-100's 1e3/1e2/100 N*m drive on a 12 g jaw overpowers the contact
+# solver on a 5 g cube, so the jaws close through it and eject it. Calibration knobs.
+STIFFNESS = [1e3] * 5 + [20.0]
+DAMPING = [1e2] * 5 + [0.5]
+FORCE_LIMIT = [100.0] * 5 + [2.0]
+
 
 @register_agent()
 class SO101(BaseAgent):
@@ -54,13 +61,13 @@ class SO101(BaseAgent):
     def _controller_configs(self):
         joints = [j.name for j in self.robot.active_joints]
         pd_joint_pos = PDJointPosControllerConfig(
-            joints, lower=None, upper=None, stiffness=[1e3] * 6, damping=[1e2] * 6,
-            force_limit=100, normalize_action=False,
+            joints, lower=None, upper=None, stiffness=STIFFNESS, damping=DAMPING,
+            force_limit=FORCE_LIMIT, normalize_action=False,
         )
         # Same bounds as SO-100: 0.05 rad/step on the arm keeps motion servo-friendly.
         pd_joint_delta_pos = PDJointPosControllerConfig(
-            joints, [-0.05] * 5 + [-0.2], [0.05] * 5 + [0.2], stiffness=[1e3] * 6, damping=[1e2] * 6,
-            force_limit=100, use_delta=True, use_target=False,
+            joints, [-0.05] * 5 + [-0.2], [0.05] * 5 + [0.2], stiffness=STIFFNESS, damping=DAMPING,
+            force_limit=FORCE_LIMIT, use_delta=True, use_target=False,
         )
         pd_joint_target_delta_pos = copy.deepcopy(pd_joint_delta_pos)
         pd_joint_target_delta_pos.use_target = True
