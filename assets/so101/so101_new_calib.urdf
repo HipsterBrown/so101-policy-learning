@@ -281,11 +281,16 @@
       </geometry>
       <material name="3d_printed"/>
     </visual>
+    <!-- so101-policy-learning: jaw collision replaced by boxes from tools/jaw_boxes.py -->
+    <!-- fixed jaw bracket -->
     <collision>
-      <origin xyz="8.32667e-17 -0.000218214 0.000949706" rpy="-3.14159 -5.55112e-17 0"/>
-      <geometry>
-        <mesh filename="assets/wrist_roll_follower_so101_v1.stl"/>
-      </geometry>
+      <origin xyz="-0.00260 -0.00200 -0.02172" rpy="0 0 0"/>
+      <geometry><box size="0.06520 0.05200 0.04543"/></geometry>
+    </collision>
+    <!-- fixed jaw finger -->
+    <collision>
+      <origin xyz="-0.02119 -0.00022 -0.07477" rpy="0 0 0"/>
+      <geometry><box size="0.02658 0.02377 0.05931"/></geometry>
     </collision>
   </link>
 
@@ -321,11 +326,16 @@
       </geometry>
       <material name="3d_printed"/>
     </visual>
+    <!-- so101-policy-learning: jaw collision replaced by boxes from tools/jaw_boxes.py -->
+    <!-- moving jaw hinge -->
     <collision>
-      <origin xyz="-5.55112e-17 -5.55112e-17 0.0189" rpy="9.53145e-17 6.93889e-18 1.24077e-24"/>
-      <geometry>
-        <mesh filename="assets/moving_jaw_so101_v1.stl"/>
-      </geometry>
+      <origin xyz="-0.00000 -0.00986 0.01890" rpy="0 0 0"/>
+      <geometry><box size="0.02000 0.03971 0.04800"/></geometry>
+    </collision>
+    <!-- moving jaw finger -->
+    <collision>
+      <origin xyz="-0.00288 -0.05694 0.01898" rpy="0 0 0"/>
+      <geometry><box size="0.01883 0.05011 0.01902"/></geometry>
     </collision>
   </link>
 
