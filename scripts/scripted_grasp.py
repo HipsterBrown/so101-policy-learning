@@ -18,7 +18,6 @@ from so101.ik import fk, grasp_pose, ik, load_chain, tilt_deg
 SEEDS = 10
 PASS_AT = 8
 MAX_LIFT_TILT = 15.0
-YAW_TRIM = 0.0  # Viam tool frame is yawed 2.8 deg from the jaw face
 # (name, steps) per segment; 125 total, well under the 200-step episode below.
 SEGMENTS = [("open", 10), ("pre", 30), ("descend", 20), ("close", 15), ("lift", 30), ("hold", 20)]
 
