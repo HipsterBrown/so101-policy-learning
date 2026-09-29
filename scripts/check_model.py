@@ -75,7 +75,7 @@ def sapien_gl(q5):
 
 
 C = np.linalg.inv(fk(chain, np.zeros(5), tcp=None)) @ sapien_gl(np.zeros(5))
-R_tool_inv = np.linalg.inv(chain.fixed[-1][:3, :3])
+R_tool_inv = R.from_euler("ZYX", [0.0486795, np.pi, 0]).inv().as_matrix()  # Viam tool rpy (0, pi, 0.0486795), hard-coded on purpose
 c_err = np.degrees(np.linalg.norm(R.from_matrix(R_tool_inv.T @ C[:3, :3]).as_rotvec()))
 check("C equals inverse of Viam tool rotation", c_err < 0.5 and np.linalg.norm(C[:3, 3]) < 1e-4,
       f"(rot err {c_err:.3f} deg, trans {np.linalg.norm(C[:3, 3]) * 1000:.3f} mm)")
@@ -89,7 +89,8 @@ check("FK cross-check", max(pos_err) < 1.0 and max(rot_err) < 0.5,
       f"(max pos {max(pos_err):.3f} mm, max rot {max(rot_err):.3f} deg)")
 robot.set_qpos(torch.zeros(1, 6))
 gfl_in_gl = np.linalg.inv(link_T("gripper_link")) @ link_T("gripper_frame_link")
-print(f"GripperTCPPose vs upstream gripper_frame_link: {np.linalg.norm(gfl_in_gl[:3, 3] - TCP_P) * 1000:.1f} mm (info, expect ~2)")
+d = np.linalg.norm(gfl_in_gl[:3, 3] - TCP_P) * 1000
+check("TCP within 5 mm of upstream gripper_frame_link", d < 5.0, f"({d:.1f} mm)")
 
 # 4. Reach-box coverage, position-only
 lo, hi = np.array(E.REACH_LO), np.array(E.REACH_HI)
@@ -108,8 +109,8 @@ for x in np.linspace(nx - r, nx + r, 5):
     for y in np.linspace(ny - r, ny + r, 5):
         for yaw in np.radians([-45, 0, 45]):
             g = np.array([x, y, E.CUBE_HALF])
-            qg, okg = ik(chain, grasp_pose(g, yaw), np.zeros(5))
-            _, okp = ik(chain, grasp_pose(g + [0, 0, 0.03], yaw), qg)
+            qp, okp = ik(chain, grasp_pose(g + [0, 0, 0.03], yaw), np.zeros(5))
+            qg, okg = ik(chain, grasp_pose(g, yaw), qp)
             ql, okl = ik(chain, grasp_pose(g + [0, 0, 0.06], yaw), qg, rot_weight=0.1)
             okl = okl and tilt_deg(fk(chain, ql)) <= 15
             if not (okg and okp and okl):
