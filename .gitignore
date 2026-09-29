@@ -1,0 +1,6 @@
+docs/superpowers/
+__pycache__/
+*.egg-info/
+.venv/
+runs/
+videos/
