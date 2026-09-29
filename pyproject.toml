@@ -17,3 +17,7 @@ dev = ["pytest"]
 
 [tool.setuptools]
 packages = ["so101"]
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"

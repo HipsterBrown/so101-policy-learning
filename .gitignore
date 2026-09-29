@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 runs/
 videos/
+.pytest_cache/
+.DS_Store
