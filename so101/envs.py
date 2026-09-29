@@ -110,6 +110,7 @@ class SO101LiftEnv(SO101BaseEnv):
         builder.initial_pose = sapien.Pose(p=[*LIFT_NOMINAL_XY, CUBE_HALF])
         self.block = builder.build(name="block")
         self.hold = torch.zeros(self.num_envs, dtype=torch.int32, device=self.device)
+        self._hold_at = torch.full((self.num_envs,), -1, dtype=torch.int32, device=self.device)
         self.goal_pos = torch.zeros(self.num_envs, 3, device=self.device)
 
     def _initialize_episode(self, env_idx: torch.Tensor, options: dict):
@@ -125,6 +126,7 @@ class SO101LiftEnv(SO101BaseEnv):
             self.block.set_pose(Pose.create_from_pq(p=xyz, q=q))
             self.goal_pos[env_idx] = xyz + torch.tensor([0.0, 0.0, LIFT_HEIGHT])
             self.hold[env_idx] = 0
+            self._hold_at[env_idx] = -1
 
     @property
     def target_pos(self):
@@ -133,9 +135,11 @@ class SO101LiftEnv(SO101BaseEnv):
     def evaluate(self):
         is_grasped = self.agent.is_grasping(self.block)
         lifted = self.block.pose.p[:, 2] - CUBE_HALF > LIFT_HEIGHT
-        # ponytail: hold counter lives in evaluate(), which ManiSkill calls once per step (and once at reset,
-        # when the block is on the ground). Move to _after_control_step if anything starts calling evaluate() extra.
-        self.hold = torch.where(lifted & is_grasped, self.hold + 1, torch.zeros_like(self.hold))
+        # evaluate() also runs on reset() and on extra get_info()/get_obs() calls, so count once per env step.
+        step = self._elapsed_steps.to(torch.int32)
+        new = step != self._hold_at
+        self.hold = torch.where(new, torch.where(lifted & is_grasped, self.hold + 1, torch.zeros_like(self.hold)), self.hold)
+        self._hold_at = step.clone()
         return dict(success=self.hold >= HOLD_STEPS, is_grasped=is_grasped, lifted=lifted)
 
     def compute_dense_reward(self, obs: Any, action: torch.Tensor, info: dict):

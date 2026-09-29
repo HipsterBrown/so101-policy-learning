@@ -1,6 +1,7 @@
 import gymnasium as gym
 import numpy as np
 import torch
+from mani_skill.utils.structs import Pose
 
 import so101.envs  # noqa: F401  registers the envs
 from so101.ik import ik, load_chain
@@ -39,4 +40,21 @@ def test_lift_not_successful_at_reset():
     env = _make("SO101Lift-v1")
     _, info = env.reset(seed=0)
     assert not info["success"].item()
+    env.close()
+
+
+def test_lift_hold_counts_once_per_step():
+    # Extra get_info()/get_obs() calls (as in vector-env resets) must not advance the hold counter.
+    env = _make("SO101Lift-v1")
+    env.reset(seed=0)
+    u = env.unwrapped
+    u.agent.is_grasping = lambda obj, **kw: torch.ones(1, dtype=torch.bool)
+    up = Pose.create_from_pq(p=torch.tensor([[0.2, 0.0, 0.015 + 0.15]]))
+    for step in range(1, 11):
+        u.block.set_pose(up)
+        u.block.set_linear_velocity(torch.zeros(1, 3))  # else gravity speeds it up and it falls out of range
+        _, _, _, _, info = env.step(torch.zeros(1, 6))
+        u.get_info()
+        u.get_info()
+        assert info["success"].item() == (step == 10), step
     env.close()
