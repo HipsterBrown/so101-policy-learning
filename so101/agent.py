@@ -25,7 +25,7 @@ _xyzw = R.from_matrix(_R_TOOL).as_quat()
 TCP_Q = np.array([_xyzw[3], *_xyzw[:3]])  # sapien uses wxyz
 
 # Gripper joint targets (rad). Calibration knobs: OPEN must clear a 3 cm cube, CLOSED squeezes past contact.
-GRIPPER_OPEN = 0.5  # finger pad stays level with a 3 cm cube and clears it by ~54 mm (Task 3 geometry review)
+GRIPPER_OPEN = 0.5  # finger pad stays level with a 3 cm cube and opens a ~54 mm jaw gap (Task 3 geometry review)
 GRIPPER_CLOSED = -0.17
 
 # Jaw opening directions in each jaw link's own frame, for is_grasping. The fixed jaw sits at -x of the

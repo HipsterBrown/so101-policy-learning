@@ -1,3 +1,4 @@
+# Original: Copyright (c) ManiSkill authors, Apache-2.0. Modified as listed below.
 # Vendored from haosulab/ManiSkill examples/baselines/ppo/ppo.py @ 62ff3a5896b4d5b4cf0ac4c8d79afe600c9404a3.
 # Local changes: import so101.envs; --output-dir/--variant/--results-csv; steps_to_80; final 100-episode eval (max_episode_steps) -> CSV.
 from collections import defaultdict
@@ -489,6 +490,8 @@ if __name__ == "__main__":
             print(f"WARNING: final eval uses {args.num_eval_envs} episodes; the spec calls for 100 (--num_eval_envs 100)")
         final = run_eval(max_episode_steps)
         print(f"final eval: {final}")
+        if steps_to_80 is None and final.get("success_once", 0.0) >= 0.8:
+            steps_to_80 = global_step
         if args.results_csv:
             import csv
             new_file = not os.path.exists(args.results_csv)

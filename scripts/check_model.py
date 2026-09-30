@@ -56,6 +56,7 @@ if "--gui" in sys.argv:
     while not u.render_human().closed:
         pass
 else:
+    (ROOT / "videos").mkdir(exist_ok=True)
     imageio.imwrite(ROOT / "videos/zero_pose.png", u.render()[0].cpu().numpy())
     print("wrote videos/zero_pose.png")
 
