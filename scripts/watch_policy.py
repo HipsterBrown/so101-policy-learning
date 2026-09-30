@@ -36,7 +36,7 @@ if args.video:
     env = RecordEpisode(env, output_dir=args.video, save_trajectory=False, video_fps=20)
 env = ManiSkillVectorEnv(env, 1, ignore_terminations=True, record_metrics=True)
 agent = ppo.Agent(env)
-agent.load_state_dict(torch.load(args.checkpoint, map_location="cpu"))  # obs dim mismatch here = checkpoint from another control mode
+agent.load_state_dict(torch.load(args.checkpoint, map_location="cpu"))  # obs dim mismatch here = checkpoint from another control mode; missing obs_mean/obs_var = Phase 1 checkpoint (pre obs-norm), retrain
 
 for ep in range(args.episodes):
     obs, _ = env.reset(seed=args.seed + ep)

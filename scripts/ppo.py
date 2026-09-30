@@ -371,7 +371,7 @@ if __name__ == "__main__":
             next_obs, reward, terminations, truncations, infos = envs.step(clip_action(action))
             next_done = torch.logical_or(terminations, truncations).to(torch.float32)
             rewards[step] = reward.view(-1) * args.reward_scale
-            term_src = infos["final_info"] if "final_info" in infos else infos  # truncation steps: auto-reset replaced infos
+            term_src = infos["final_info"] if "final_info" in infos else infos  # done steps: auto-reset replaced infos, terms are in final_info
             for k in term_src:
                 if k.startswith("r_"):
                     reward_terms[k] = reward_terms[k] + term_src[k].float().mean()

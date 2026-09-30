@@ -24,7 +24,7 @@ REACH_HI = (0.30, 0.15, 0.20)
 CUBE_HALF = 0.015
 LIFT_NOMINAL_XY = (0.20, 0.0)
 LIFT_XY_RANGE = 0.05
-LIFT_HEIGHT = 0.05
+LIFT_HEIGHT = 0.05  # `lifted` / success threshold above spawn; the reward goal is LIFT_GOAL
 HOLD_STEPS = 10
 # Lift reward saturates LIFT_GOAL above spawn: 1 cm over the `lifted` line, below the scripted lift's 6.2-6.3 cm
 # (wrist_flex saturates near its limit there). A two-sided goal on the line would reward hovering where `lifted` flickers.

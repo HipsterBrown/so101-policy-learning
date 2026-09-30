@@ -36,7 +36,8 @@ def fast_grasp(env, seed, max_steps=100):
     """Max-rate scripted grasp under pd_joint_target_delta_pos on a num_envs=1 SO101Lift-v1 env.
 
     Returns {success, first_success_step, steps}; steps[i] = dict(reward, is_grasped, lifted, success,
-    grasp_err) for env step i+1, where grasp_err = |grasp_center - block| in metres.
+    grasp_err) for env step i+1; reward is in the env's reward_mode (the tests use dense);
+    grasp_err = |grasp_center - block| in metres.
     """
     env.reset(seed=seed)
     u = env.unwrapped
