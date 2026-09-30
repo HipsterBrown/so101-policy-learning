@@ -78,7 +78,7 @@ def test_lift_reward_trace_with_fast_oracle():
             assert s["reward"] == R_SUCCESS
             assert s["grasp_err"] < 0.005  # grasp_center sits on the held block's centre
         elif s["is_grasped"] and s["lifted"]:
-            assert s["reward"] >= 2 + min_action
+            assert s["reward"] >= 2.5 + min_action  # reach + grasp + lift near goal (+ static when still)
         elif s["is_grasped"]:
-            assert s["reward"] >= 1 + min_action
+            assert s["reward"] >= 1.5 + min_action  # reach + grasp + lift at rest (1 - tanh(0.3) = 0.71): fails if a term drops
         assert min_action / R_SUCCESS <= s["reward"] / R_SUCCESS <= 1
