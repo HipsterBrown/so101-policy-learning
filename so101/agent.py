@@ -71,10 +71,13 @@ class SO101(BaseAgent):
         )
         pd_joint_target_delta_pos = copy.deepcopy(pd_joint_delta_pos)
         pd_joint_target_delta_pos.use_target = True
+        # First key is ManiSkill's default control mode. Target-delta (the brief's "small change to each joint's
+        # target angle") tracks ~85% of a max step; delta-from-current-qpos sags under gravity to ~39%, which
+        # capped a scripted Reach oracle at 61/100 in 50 steps vs 100/100 here.
         return deepcopy_dict(dict(
+            pd_joint_target_delta_pos=pd_joint_target_delta_pos,
             pd_joint_delta_pos=pd_joint_delta_pos,
             pd_joint_pos=pd_joint_pos,
-            pd_joint_target_delta_pos=pd_joint_target_delta_pos,
         ))
 
     def _after_loading_articulation(self):

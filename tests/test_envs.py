@@ -11,13 +11,14 @@ def _make(env_id, **kw):
     return gym.make(env_id, num_envs=1, obs_mode="state", **kw)
 
 
-def test_obs_is_26_floats():
+def test_obs_is_32_floats():
+    # qpos 6, qvel 6, controller target qpos 6, tcp 3, block pose 7, target 3, is_grasped 1
     for env_id in ["SO101Reach-v1", "SO101Lift-v1"]:
         env = _make(env_id)
         obs, _ = env.reset(seed=0)
-        assert obs.shape == (1, 26), (env_id, obs.shape)
+        assert obs.shape == (1, 32), (env_id, obs.shape)
         obs, *_ = env.step(env.action_space.sample())
-        assert obs.shape == (1, 26)
+        assert obs.shape == (1, 32)
         env.close()
 
 

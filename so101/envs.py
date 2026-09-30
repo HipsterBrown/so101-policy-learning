@@ -1,4 +1,4 @@
-"""SO101Reach-v1 and SO101Lift-v1: same 26-float state obs and joint-delta action, different reset/success/reward."""
+"""SO101Reach-v1 and SO101Lift-v1: same 32-float state obs and joint target-delta action, different reset/success/reward."""
 from typing import Any
 
 import numpy as np
