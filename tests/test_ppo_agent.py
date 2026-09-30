@@ -33,6 +33,16 @@ def test_obs_stats_merge_matches_full_batch():
     assert torch.allclose(a.obs_mean, b.obs_mean, atol=1e-4) and torch.allclose(a.obs_var, b.obs_var, atol=1e-3)
 
 
+def test_obs_stats_merge_of_shifted_batches_matches_ground_truth():
+    agent = ppo.Agent(_Envs())
+    x = torch.randn(2000, 4)
+    agent.update_obs_stats(x[:700])
+    agent.update_obs_stats(x[700:] + 10)  # large delta between batches exercises the delta**2 term
+    full = torch.cat([x[:700], x[700:] + 10])
+    assert torch.allclose(agent.obs_mean, full.mean(0), rtol=1e-4)
+    assert torch.allclose(agent.obs_var, full.var(0, unbiased=False), rtol=1e-3)
+
+
 def test_obs_stats_survive_state_dict_round_trip():
     a = ppo.Agent(_Envs())
     a.update_obs_stats(torch.randn(100, 4) + 3)
