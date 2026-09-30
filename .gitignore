@@ -6,3 +6,4 @@ runs/
 videos/
 .pytest_cache/
 .DS_Store
+uv.lock
