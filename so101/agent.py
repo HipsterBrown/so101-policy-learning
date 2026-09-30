@@ -14,7 +14,7 @@ from mani_skill.utils import common
 from mani_skill.utils.structs.actor import Actor
 from mani_skill.utils.structs.pose import Pose
 
-from so101.ik import GRIPPER_TCP, load_chain
+from so101.ik import GRASP_X_OFFSET, GRIPPER_TCP, load_chain
 
 URDF = Path(__file__).resolve().parents[1] / "assets/so101/so101_new_calib.urdf"
 
@@ -94,6 +94,12 @@ class SO101(BaseAgent):
     @property
     def tcp_pos(self):
         return self.tcp_pose.p
+
+    @property
+    def grasp_center(self):
+        """Where a held block's centre sits: GRASP_X_OFFSET from the fixed-jaw TCP toward the moving jaw (tool -x)."""
+        offset = Pose.create_from_pq(p=torch.tensor([-GRASP_X_OFFSET, 0.0, 0.0]), device=self.device)
+        return (self.tcp_pose * offset).p
 
     def is_grasping(self, object: Actor, min_force=0.5, max_angle=110):
         l_forces = self.scene.get_pairwise_contact_forces(self.finger1_link, object)

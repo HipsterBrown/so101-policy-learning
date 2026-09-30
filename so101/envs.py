@@ -26,6 +26,12 @@ LIFT_NOMINAL_XY = (0.20, 0.0)
 LIFT_XY_RANGE = 0.05
 LIFT_HEIGHT = 0.05
 HOLD_STEPS = 10
+# Lift reward saturates LIFT_GOAL above spawn: 1 cm over the `lifted` line, below the scripted lift's 6.2-6.3 cm
+# (wrist_flex saturates near its limit there). A two-sided goal on the line would reward hovering where `lifted` flickers.
+LIFT_GOAL = 0.06
+# Reward weights (Phase 2 spec §1), fixed before tuning; log every change in the spec's Change log.
+W_REACH, W_GRASP, W_LIFT, W_STATIC, W_ACTION = 1.0, 1.0, 1.0, 1.0, 0.01
+R_SUCCESS = W_REACH + W_GRASP + W_LIFT + W_STATIC + 1.0  # success always pays the most; also the normalizer
 QPOS_NOISE = 0.02
 
 
@@ -131,7 +137,7 @@ class SO101LiftEnv(SO101BaseEnv):
             yaw = (torch.rand(b) * 2 - 1) * (np.pi / 2)
             q = torch.stack([torch.cos(yaw / 2), torch.zeros(b), torch.zeros(b), torch.sin(yaw / 2)], dim=-1)
             self.block.set_pose(Pose.create_from_pq(p=xyz, q=q))
-            self.goal_pos[env_idx] = xyz + torch.tensor([0.0, 0.0, LIFT_HEIGHT])
+            self.goal_pos[env_idx] = xyz + torch.tensor([0.0, 0.0, LIFT_GOAL])
             self.hold[env_idx] = 0
             self._hold_at[env_idx] = -1
 
@@ -150,7 +156,17 @@ class SO101LiftEnv(SO101BaseEnv):
         return dict(success=self.hold >= HOLD_STEPS, is_grasped=is_grasped, lifted=lifted)
 
     def compute_dense_reward(self, obs: Any, action: torch.Tensor, info: dict):
-        return torch.zeros(self.num_envs, device=self.device)  # staged reward is Phase 2
+        # PickCube-style staged reward (spec §1). Terms go into `info` (returned by step) for per-term logging.
+        b = self.block.pose.p
+        G, L = info["is_grasped"].float(), info["lifted"].float()
+        info["r_reach"] = W_REACH * (1 - torch.tanh(5 * torch.linalg.norm(self.agent.grasp_center - b, axis=1)))
+        info["r_grasp"] = W_GRASP * G
+        info["r_lift"] = W_LIFT * (1 - torch.tanh(5 * (self.goal_pos[:, 2] - b[:, 2]).clamp_min(0))) * G
+        qvel_arm = self.agent.robot.get_qvel()[:, :5]
+        info["r_static"] = W_STATIC * (1 - torch.tanh(5 * torch.linalg.norm(qvel_arm, axis=1))) * G * L
+        info["r_action"] = -W_ACTION * (action ** 2).sum(-1)
+        reward = info["r_reach"] + info["r_grasp"] + info["r_lift"] + info["r_static"] + info["r_action"]
+        return torch.where(info["success"], torch.full_like(reward, R_SUCCESS), reward)
 
     def compute_normalized_dense_reward(self, obs: Any, action: torch.Tensor, info: dict):
-        return self.compute_dense_reward(obs, action, info)
+        return self.compute_dense_reward(obs, action, info) / R_SUCCESS

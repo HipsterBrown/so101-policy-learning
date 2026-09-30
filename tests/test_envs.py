@@ -59,3 +59,26 @@ def test_lift_hold_counts_once_per_step():
         u.get_info()
         assert info["success"].item() == (step == 10), step
     env.close()
+
+
+def test_lift_reward_trace_with_fast_oracle():
+    # Staged reward climbs through the scripted grasp and success pays exactly R_SUCCESS (spec §3).
+    from so101.envs import R_SUCCESS, W_ACTION
+    from so101.oracle import fast_grasp
+    env = _make("SO101Lift-v1", reward_mode="dense")
+    out = fast_grasp(env, seed=0)
+    env.close()
+    assert out["success"], out["first_success_step"]
+    steps = out["steps"]
+    pre = [s for s in steps[: out["first_success_step"]] if not s["is_grasped"]]
+    assert pre[-1]["reward"] > pre[0]["reward"]
+    min_action = -W_ACTION * 6  # clipped actions: ||a||^2 <= 6
+    for s in steps:
+        if s["success"]:
+            assert s["reward"] == R_SUCCESS
+            assert s["grasp_err"] < 0.005  # grasp_center sits on the held block's centre
+        elif s["is_grasped"] and s["lifted"]:
+            assert s["reward"] >= 2 + min_action
+        elif s["is_grasped"]:
+            assert s["reward"] >= 1 + min_action
+        assert min_action / R_SUCCESS <= s["reward"] / R_SUCCESS <= 1
