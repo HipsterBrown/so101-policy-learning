@@ -1,6 +1,6 @@
 # Original: Copyright (c) ManiSkill authors, Apache-2.0. Modified as listed below.
 # Vendored from haosulab/ManiSkill examples/baselines/ppo/ppo.py @ 62ff3a5896b4d5b4cf0ac4c8d79afe600c9404a3.
-# Local changes: import so101.envs; control_mode default None (env default); --output-dir/--variant/--results-csv; steps_to_80; final 100-episode eval (max_episode_steps) -> CSV.
+# Local changes: import so101.envs; control_mode default None (env default); obs normalization + ent_coef 0.01; reward/<term> logging; --output-dir/--variant/--results-csv; steps_to_80; final 100-episode eval (max_episode_steps) -> CSV.
 from collections import defaultdict
 import os
 import random
@@ -93,11 +93,13 @@ class Args:
     """the K epochs to update the policy"""
     norm_adv: bool = True
     """Toggles advantages normalization"""
+    norm_obs: bool = True
+    """running observation normalization (stats stored in the checkpoint)"""
     clip_coef: float = 0.2
     """the surrogate clipping coefficient"""
     clip_vloss: bool = False
     """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
-    ent_coef: float = 0.0
+    ent_coef: float = 0.01
     """coefficient of the entropy"""
     vf_coef: float = 0.5
     """coefficient of the value function"""
@@ -129,8 +131,14 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 
 class Agent(nn.Module):
-    def __init__(self, envs):
+    def __init__(self, envs, norm_obs=True):
         super().__init__()
+        n_obs = int(np.array(envs.single_observation_space.shape).prod())
+        # Running obs normalization (buffers: saved in state_dict, not optimized). Identity stats when norm_obs=False.
+        self.norm_obs = norm_obs
+        self.register_buffer("obs_mean", torch.zeros(n_obs))
+        self.register_buffer("obs_var", torch.ones(n_obs))
+        self.register_buffer("obs_count", torch.tensor(1e-4))
         self.critic = nn.Sequential(
             layer_init(nn.Linear(np.array(envs.single_observation_space.shape).prod(), 256)),
             nn.Tanh(),
@@ -151,9 +159,27 @@ class Agent(nn.Module):
         )
         self.actor_logstd = nn.Parameter(torch.ones(1, np.prod(envs.single_action_space.shape)) * -0.5)
 
+    def normalize(self, x):
+        if not self.norm_obs:
+            return x
+        # variance floor: block/target z barely vary until the first lifts, which would otherwise clip at +/-10
+        return torch.clamp((x - self.obs_mean) / torch.sqrt(self.obs_var.clamp_min(1e-4)), -10, 10)
+    @torch.no_grad()
+    def update_obs_stats(self, x):
+        """Merge a batch into the running mean/var (CleanRL/SB3 RunningMeanStd). Once per iteration; never in eval."""
+        if not self.norm_obs:
+            return
+        x = x.reshape(-1, self.obs_mean.shape[0]).float()
+        b_mean, b_var, b_count = x.mean(0), x.var(0, unbiased=False), x.shape[0]
+        delta, total = b_mean - self.obs_mean, self.obs_count + b_count
+        m2 = self.obs_var * self.obs_count + b_var * b_count + delta ** 2 * self.obs_count * b_count / total
+        self.obs_mean.add_(delta * b_count / total)
+        self.obs_var.copy_(m2 / total)
+        self.obs_count.copy_(total)
     def get_value(self, x):
-        return self.critic(x)
+        return self.critic(self.normalize(x))
     def get_action(self, x, deterministic=False):
+        x = self.normalize(x)
         action_mean = self.actor_mean(x)
         if deterministic:
             return action_mean
@@ -162,6 +188,7 @@ class Agent(nn.Module):
         probs = Normal(action_mean, action_std)
         return probs.sample()
     def get_action_and_value(self, x, action=None):
+        x = self.normalize(x)
         action_mean = self.actor_mean(x)
         action_logstd = self.actor_logstd.expand_as(action_mean)
         action_std = torch.exp(action_logstd)
@@ -253,7 +280,7 @@ if __name__ == "__main__":
     else:
         print("Running evaluation")
 
-    agent = Agent(envs).to(device)
+    agent = Agent(envs, norm_obs=args.norm_obs).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
     # ALGO Logic: Storage setup
@@ -268,6 +295,7 @@ if __name__ == "__main__":
     global_step = 0
     start_time = time.time()
     next_obs, _ = envs.reset(seed=args.seed)
+    agent.update_obs_stats(next_obs)  # seed the stats; a --checkpoint load below overwrites them
     eval_obs, _ = eval_envs.reset(seed=args.seed)
     next_done = torch.zeros(args.num_envs, device=device)
     print(f"####")
@@ -326,6 +354,7 @@ if __name__ == "__main__":
             optimizer.param_groups[0]["lr"] = lrnow
 
         rollout_time = time.time()
+        reward_terms = defaultdict(float)  # per-term reward means (envs that write r_* into info)
         for step in range(0, args.num_steps):
             global_step += args.num_envs
             obs[step] = next_obs
@@ -342,6 +371,10 @@ if __name__ == "__main__":
             next_obs, reward, terminations, truncations, infos = envs.step(clip_action(action))
             next_done = torch.logical_or(terminations, truncations).to(torch.float32)
             rewards[step] = reward.view(-1) * args.reward_scale
+            term_src = infos["final_info"] if "final_info" in infos else infos  # truncation steps: auto-reset replaced infos
+            for k in term_src:
+                if k.startswith("r_"):
+                    reward_terms[k] = reward_terms[k] + term_src[k].float().mean()
 
             if "final_info" in infos:
                 final_info = infos["final_info"]
@@ -351,6 +384,8 @@ if __name__ == "__main__":
                 with torch.no_grad():
                     final_values[step, torch.arange(args.num_envs, device=device)[done_mask]] = agent.get_value(infos["final_observation"][done_mask]).view(-1)
         rollout_time = time.time() - rollout_time
+        for k, v in reward_terms.items():
+            logger.add_scalar(f"reward/{k[2:]}", float(v) / args.num_steps, global_step)
         # bootstrap value according to termination and truncation
         with torch.no_grad():
             next_value = agent.get_value(next_obs).reshape(1, -1)
@@ -462,6 +497,7 @@ if __name__ == "__main__":
                 break
 
         update_time = time.time() - update_time
+        agent.update_obs_stats(b_obs)  # stats frozen through rollout + update, so stored logprobs match the update's
 
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
