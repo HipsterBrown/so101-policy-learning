@@ -1,6 +1,6 @@
 # Original: Copyright (c) ManiSkill authors, Apache-2.0. Modified as listed below.
 # Vendored from haosulab/ManiSkill examples/baselines/ppo/ppo.py @ 62ff3a5896b4d5b4cf0ac4c8d79afe600c9404a3.
-# Local changes: import so101.envs; --output-dir/--variant/--results-csv; steps_to_80; final 100-episode eval (max_episode_steps) -> CSV.
+# Local changes: import so101.envs; control_mode default None (env default); --output-dir/--variant/--results-csv; steps_to_80; final 100-episode eval (max_episode_steps) -> CSV.
 from collections import defaultdict
 import os
 import random
@@ -79,8 +79,8 @@ class Args:
     """how often to reconfigure the environment during training"""
     eval_reconfiguration_freq: Optional[int] = 1
     """for benchmarking purposes we want to reconfigure the eval environment each reset to ensure objects are randomized in some tasks"""
-    control_mode: Optional[str] = "pd_joint_delta_pos"
-    """the control mode to use for the environment"""
+    control_mode: Optional[str] = None
+    """the control mode to use for the environment (None: the env/agent default, pd_joint_target_delta_pos for SO-101)"""
     anneal_lr: bool = False
     """Toggle learning rate annealing for policy and value networks"""
     gamma: float = 0.8
@@ -224,6 +224,7 @@ if __name__ == "__main__":
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
     max_episode_steps = gym_utils.find_max_episode_steps_value(envs._env)
+    print(f"control_mode={envs.unwrapped.control_mode} obs_dim={envs.single_observation_space.shape}")
     logger = None
     if not args.evaluate:
         print("Running training")
